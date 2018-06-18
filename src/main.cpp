@@ -244,14 +244,20 @@ int main() {
 
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
-          	double dist_inc = 0.5;
-          	for(int i = 0; i<50; i++){
-          		double next_s = car_s + i*dist_inc;
-          		double d = 6;
-          		vector<double> xy = getXY(next_s,d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-          		next_x_vals.push_back(xy[0]);
-          		next_y_vals.push_back(xy[1]);
-          	}
+            double pos_s;
+            double pos_d;
+            
+            int path_size = previous_path_x.size();            
+
+            double dist_inc = 0.5;
+            for(int i = 0; i < 50; i++)
+            {                    
+                pos_s = car_s + dist_inc * (i+1);                
+                pos_d = 6;
+                vector<double> xy = getXY(pos_s, pos_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                next_x_vals.push_back(xy[0]);
+                next_y_vals.push_back(xy[1]);
+            }
 
           	msgJson["next_x"] = next_x_vals;
           	msgJson["next_y"] = next_y_vals;
