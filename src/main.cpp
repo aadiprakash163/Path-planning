@@ -249,40 +249,77 @@ int main() {
 
           	int prev_size = previous_path_x.size();  
           	
+            // Some flags
             bool car_in_front = false;
+            bool car_in_left = false;
+            bool car_in_right = false;
+
             double new_ref_v;
             double decc = 0;
-            double acc = 0.4;
+            double acc = 0.4;            
 
+            double del_v;
+            double separation;
+
+            // her denotes other vehicles.
             for(int i = 0; i<sensor_fusion.size();i++){
+              double her_vx = sensor_fusion[i][3];
+              double her_vy = sensor_fusion[i][4];
+              double her_s = sensor_fusion[i][5];
               double her_d = sensor_fusion[i][6];
-              if(her_d>4 && her_d<8){                
-                double her_s = sensor_fusion[i][5];
-                double her_vx = sensor_fusion[i][3];
-                double her_vy = sensor_fusion[i][4];
-                double her_abs_vel = sqrt(her_vx*her_vx + her_vy*her_vy);
-                if(her_s > car_s && (her_s - car_s) < 30){
-                  cout<<"Vehicle came close...Following the vehicle"<<"\n";                  
-                  double separation = her_s - car_s;
-                  cout<<"separation: "<<separation<<"\n";
-                  double del_v = ref_vel - her_abs_vel;
-                  cout<<"delta v: "<<del_v<<"\n";                  
-                  decc =  0.5*(del_v/separation);
-                  cout<<"deccelaration: "<<decc<<"\n\n";
-                  MAX_VEL = her_abs_vel;
-                  car_in_front = true;
-                  
-                }
+              int her_lane;
+              
+              // Get her lane number.
+              if(her_d < 4) her_lane = 0;
+              else if(her_d < 8) her_lane = 1;
+              else her_lane = 2;
 
+              // Predict her future position.
+              double her_abs_vel = sqrt(her_vx*her_vx + her_vy*her_vy);
+              double her_pred_s = her_s + her_abs_vel * 0.02 * prev_size;
+  
+              // Set flags according to the scenario.
+              if(her_lane == (lane-1) && her_pred_s > (end_path_s -10) && her_pred_s < (end_path_s + 30) ){
+                car_in_left = true;
               }
+
+              if(her_lane == (lane+1) && her_pred_s > (end_path_s -10) && her_pred_s < (end_path_s + 30) ){
+                car_in_right = true;
+              }
+
+              if(her_lane == lane && her_pred_s > end_path_s and her_pred_s < end_path_s+30){
+                car_in_front = true;
+                separation = her_pred_s - end_path_s;                
+                del_v = ref_vel - her_abs_vel;                
+                decc =  0.3*(del_v/separation); // Decceleration is set based on separation and velocity difference.
+                MAX_VEL = her_abs_vel;
+              }
+
+              
             }
 
+            // Make decision based on the scenario. Overtaking from left is given preference.
+            if(car_in_front && !car_in_left && lane>0){
+              lane -= 1;
+              cout<<"Changing lane to left."<<"\n";
+            } 
+            else if(car_in_front && !car_in_right && lane <2){
+              lane += 1;
+              cout<<"Changing lane to right."<<"\n";
+            } 
+            else if(car_in_front){
+                cout<<"Lane change not possible...Following the front vehicle"<<"\n";                                    
+                
+            }                 
+
+            // Modify velocity.
             if(car_in_front && ref_vel > MAX_VEL){
               ref_vel -= decc;
             }
             else if(ref_vel < MAX_VEL){
               ref_vel += acc;
-            }
+            }        
+
             
             
             
@@ -330,9 +367,12 @@ int main() {
 
             // These way points are generated to create a spline that starts from current position and goes along 
             // 30, 60, 90 meter marks ahead in the same lane. Using Frenet coordinates makes this very convinient.
-            vector<double> next_wp0 = getXY(car_s+30, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            vector<double> next_wp1 = getXY(car_s+60, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            vector<double> next_wp2 = getXY(car_s+90, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            
+            // With 30, 60 and 90, lane change were very abrupt causing red flag for jerk. Changing them to 50, 100
+            // 150 resulted in very graceful lane change.
+            vector<double> next_wp0 = getXY(car_s+50, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            vector<double> next_wp1 = getXY(car_s+100, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            vector<double> next_wp2 = getXY(car_s+150, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
             
 
 
@@ -378,7 +418,7 @@ int main() {
 
           	double x_add_on = 0;
 
-          	for(int i =1; i<=50-previous_path_x.size(); i++){
+          	for(int i =1; i<=50 - previous_path_x.size(); i++){
           		double N = (target_dist/(.02*ref_vel/2.24));
           		double x_point = x_add_on + (target_x)/N;
           		double y_point = s(x_point);
