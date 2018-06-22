@@ -201,12 +201,12 @@ int main() {
   	map_waypoints_dy.push_back(d_y);
   }
   
-  // int lane = 1;
+  int lane = 1;
 
-  // double ref_vel = 49.5;
+  double ref_vel = 0.0;
 
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane, &ref_vel](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -234,6 +234,8 @@ int main() {
           	double car_yaw = j[1]["yaw"];
           	double car_speed = j[1]["speed"];
 
+            double MAX_VEL = 49.5;
+
           	// Previous path data given to the Planner
           	auto previous_path_x = j[1]["previous_path_x"];
           	auto previous_path_y = j[1]["previous_path_y"];
@@ -246,9 +248,44 @@ int main() {
           	auto sensor_fusion = j[1]["sensor_fusion"];
 
           	int prev_size = previous_path_x.size();  
-          	int lane = 1;
+          	
+            bool car_in_front = false;
+            double new_ref_v;
+            double decc = 0;
+            double acc = 0.4;
 
-  			    double ref_vel = 49.9;
+            for(int i = 0; i<sensor_fusion.size();i++){
+              double her_d = sensor_fusion[i][6];
+              if(her_d>4 && her_d<8){                
+                double her_s = sensor_fusion[i][5];
+                double her_vx = sensor_fusion[i][3];
+                double her_vy = sensor_fusion[i][4];
+                double her_abs_vel = sqrt(her_vx*her_vx + her_vy*her_vy);
+                if(her_s > car_s && (her_s - car_s) < 30){
+                  cout<<"Vehicle came close...Following the vehicle"<<"\n";                  
+                  double separation = her_s - car_s;
+                  cout<<"separation: "<<separation<<"\n";
+                  double del_v = ref_vel - her_abs_vel;
+                  cout<<"delta v: "<<del_v<<"\n";                  
+                  decc =  0.5*(del_v/separation);
+                  cout<<"deccelaration: "<<decc<<"\n\n";
+                  MAX_VEL = her_abs_vel;
+                  car_in_front = true;
+                  
+                }
+
+              }
+            }
+
+            if(car_in_front && ref_vel > MAX_VEL){
+              ref_vel -= decc;
+            }
+            else if(ref_vel < MAX_VEL){
+              ref_vel += acc;
+            }
+            
+            
+            
           	
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
@@ -296,21 +333,17 @@ int main() {
             vector<double> next_wp0 = getXY(car_s+30, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
             vector<double> next_wp1 = getXY(car_s+60, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
             vector<double> next_wp2 = getXY(car_s+90, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            // vector<double> next_wp3 = getXY(car_s+120, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            // vector<double> next_wp4 = getXY(car_s+150, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            
 
 
             ptsx.push_back(next_wp0[0]);
             ptsx.push_back(next_wp1[0]);
             ptsx.push_back(next_wp2[0]);
-            // ptsx.push_back(next_wp3[0]);
-            // ptsx.push_back(next_wp4[0]);
+            
 
             ptsy.push_back(next_wp0[1]);
             ptsy.push_back(next_wp1[1]);
             ptsy.push_back(next_wp2[1]);
-            // ptsy.push_back(next_wp3[1]);
-            // ptsy.push_back(next_wp4[1]);
 
 
             // Transform global coordinates to car's local coordinates. This makes spline calculation efficient.
