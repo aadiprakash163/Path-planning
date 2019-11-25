@@ -260,6 +260,7 @@ int main() {
 
             double del_v;
             double separation;
+            double dist_ahead[3] = {10000.0, 10000.0, 10000.0};
 
             // her denotes other vehicles.
             for(int i = 0; i<sensor_fusion.size();i++){
@@ -273,6 +274,11 @@ int main() {
               if(her_d < 4) her_lane = 0;
               else if(her_d < 8) her_lane = 1;
               else her_lane = 2;
+
+              if((her_s - car_s)>0 && (her_s - car_s) < dist_ahead[her_lane]){
+                dist_ahead[her_lane] = her_s - car_s;
+              }
+
 
               // Predict her future position.
               double her_abs_vel = sqrt(her_vx*her_vx + her_vy*her_vy);
@@ -299,7 +305,17 @@ int main() {
             }
 
             // Make decision based on the scenario. Overtaking from left is given preference.
-            if(car_in_front && !car_in_left && lane>0){
+            if(car_in_front && !car_in_right && !car_in_right && lane == 1){
+              if(dist_ahead[0] >= dist_ahead[2]) {
+                lane -= 1;
+                cout<<"Changing lane to left.."<<"\n";
+              }
+              else{
+                lane += 1;
+                cout<<"Changing lane to right.."<<"\n";  
+              } 
+            }
+            else if(car_in_front && !car_in_left && lane>0){
               lane -= 1;
               cout<<"Changing lane to left."<<"\n";
             } 
